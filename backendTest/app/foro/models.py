@@ -9,8 +9,9 @@ class Tema(models.Model):
     """
     Modelo para los temas (foros) creados por los usuarios.
     """
-    titulo = models.CharField("Título del tema", max_length=1000, null=True)
-    contenido = models.TextField("Contenido del tema", unique=True, blank=True, null=True)
+    titulo = models.CharField("Título del tema", max_length=255)
+    contenido = models.TextField("Contenido del tema")
+    imagen = models.CharField("URL de imagen del tema", max_length=500, null=True, blank=True, help_text="URL de imagen opcional para el tema")
     autor = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -21,7 +22,9 @@ class Tema(models.Model):
         on_delete=models.CASCADE,
         related_name="temas",
         verbose_name="Categoría del foro",
-        help_text="Selecciona la categoría a la que pertenece este tema"
+        help_text="Selecciona la categoría a la que pertenece este tema",
+        null=True,
+        blank=True
     )
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -96,3 +99,25 @@ class LikeTema(models.Model):
 
     def __str__(self):
         return f"{self.usuario} 👍 {self.tema.titulo}"
+
+
+class LikeComentarioTema(models.Model):
+    """
+    Sistema de likes para comentarios individuales del foro.
+    Un usuario puede dar 'me gusta' a un comentario específico.
+    """
+    comentario = models.ForeignKey(
+        ComentarioTema, on_delete=models.CASCADE, related_name="likes"
+    )
+    usuario = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="likes_comentarios_foro"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("comentario", "usuario")
+        verbose_name = "Like de Comentario de Foro"
+        verbose_name_plural = "Likes de Comentarios de Foro"
+
+    def __str__(self):
+        return f"{self.usuario} 👍 comentario en {self.comentario.tema.titulo}"

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Tema, ComentarioTema, LikeTema, Categoria_Foro
+from .models import Tema, ComentarioTema, LikeTema, LikeComentarioTema, Categoria_Foro
 
 User = get_user_model()
 
@@ -38,9 +38,23 @@ class LikeTemaSerializer(serializers.ModelSerializer):
         read_only_fields = ["usuario", "creado_en"]
 
 
+class LikeComentarioTemaSerializer(serializers.ModelSerializer):
+    """
+    Serializer para likes de comentarios individuales del foro.
+    Solo 'me gusta' - sin 'no me gusta'.
+    """
+    usuario = AutorForoSerializer(read_only=True)  # Incluir información detallada del usuario
+    
+    class Meta:
+        model = LikeComentarioTema
+        fields = ["id", "usuario", "creado_en"]
+        read_only_fields = ["usuario", "creado_en"]
+
+
 class ComentarioTemaSerializer(serializers.ModelSerializer):
     autor = AutorForoSerializer(read_only=True)
     respuestas = serializers.SerializerMethodField()
+    likes_count = serializers.SerializerMethodField()
     parent = OptionalParentFieldTema(
         queryset=ComentarioTema.objects.all(),
         required=False,
@@ -53,9 +67,9 @@ class ComentarioTemaSerializer(serializers.ModelSerializer):
         model = ComentarioTema
         fields = [
             "id", "tema", "autor", "contenido", "parent",
-            "creado_en", "respuestas"
+            "creado_en", "respuestas", "likes_count"
         ]
-        read_only_fields = ["autor", "creado_en", "respuestas"]
+        read_only_fields = ["autor", "creado_en", "respuestas", "likes_count"]
 
     def get_respuestas(self, obj):
         return ComentarioTemaSerializer(
@@ -63,6 +77,10 @@ class ComentarioTemaSerializer(serializers.ModelSerializer):
             many=True,
             context=self.context
         ).data
+    
+    def get_likes_count(self, obj):
+        """Cantidad total de 'me gusta' en este comentario"""
+        return obj.likes.count()
 
 
 class TemaSerializer(serializers.ModelSerializer):
@@ -82,12 +100,19 @@ class TemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tema
         fields = [
-            "id", "titulo", "contenido", "autor",
+            "id", "titulo", "contenido", "imagen", "autor",
             "categoria_foro", "categoria_foro_id",
             "creado_en", "actualizado_en",
             "comentarios", "likes_count"
         ]
         read_only_fields = ["autor", "creado_en", "actualizado_en"]
+
+    def validate_imagen(self, value):
+        """Validar imagen - permitir string vacío o URL válida"""
+        if not value or value.strip() == "" or value == "null":
+            return None
+        # Si hay valor, puede ser una URL o path de imagen
+        return value.strip()
 
     def get_comentarios(self, obj):
         comentarios_principales = obj.comentarios.filter(parent__isnull=True)

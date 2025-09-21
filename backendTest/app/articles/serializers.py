@@ -32,6 +32,8 @@ class LikeArticuloSerializer(serializers.ModelSerializer):
     Serializer para likes de artículos.
     Solo 'me gusta' - sin 'no me gusta'.
     """
+    usuario = AutorArticuloSerializer(read_only=True)  # Incluir información detallada del usuario
+    
     class Meta:
         model = LikeArticulo
         fields = ["id", "usuario", "creado_en"]

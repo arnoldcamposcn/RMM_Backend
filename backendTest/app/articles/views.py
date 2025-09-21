@@ -55,36 +55,166 @@ class ArticuloViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Acción para dar o quitar 'like' a un artículo completo.
         
-        Comportamiento:
-        - Si no ha dado like -> Se crea el like
-        - Si ya dio like -> Se elimina el like
+        Comportamiento estricto:
+        - Requiere especificar la acción: "add" o "remove"
+        - Si action="add" y ya tiene like -> ERROR 400
+        - Si action="remove" y no tiene like -> ERROR 400
+        - Solo permite toggle automático si no se especifica action
+
+        Payload requerido para validación estricta:
+        {
+            "action": "add"    // Para dar like
+            "action": "remove" // Para quitar like
+        }
         
-        No requiere payload, solo POST vacío.
+        Si no se envía "action", funciona como toggle (comportamiento anterior).
         """
         articulo = get_object_or_404(Articulos, pk=pk)
         user = request.user
-
-        # Verificar si ya existe un like del usuario
+        
+        # Obtener la acción solicitada
+        action = request.data.get('action', None)
+        
+        # Verificar el estado actual del like
         like_obj = LikeArticulo.objects.filter(articulo=articulo, usuario=user).first()
+        has_like = bool(like_obj)
 
-        if like_obj:
-            # Si existe, eliminarlo (quitar like)
-            like_obj.delete()
-            liked = False
-            message = "👍 Like eliminado"
+        # Si se especifica una acción, validar estrictamente
+        if action == "add":
+            if has_like:
+                # Ya tiene like, no puede dar like otra vez
+                return Response(
+                    {
+                        "error": "Like duplicado",
+                        "message": "Ya has dado like a este artículo anteriormente.",
+                        "code": "DUPLICATE_LIKE",
+                        "articulo": articulo.id,
+                        "usuario": user.id,
+                        "liked": True,
+                        "likes_count": articulo.likes.count()
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                # No tiene like, crear uno nuevo
+                LikeArticulo.objects.create(articulo=articulo, usuario=user)
+                return Response(
+                    {
+                        "articulo": articulo.id,
+                        "usuario": user.id,
+                        "liked": True,
+                        "likes_count": articulo.likes.count(),
+                        "message": "👍 Like agregado exitosamente"
+                    },
+                    status=status.HTTP_200_OK
+                )
+                
+        elif action == "remove":
+            if not has_like:
+                # No tiene like, no puede quitar lo que no existe
+                return Response(
+                    {
+                        "error": "Like no encontrado",
+                        "message": "No has dado like a este artículo anteriormente.",
+                        "code": "LIKE_NOT_FOUND",
+                        "articulo": articulo.id,
+                        "usuario": user.id,
+                        "liked": False,
+                        "likes_count": articulo.likes.count()
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                # Tiene like, eliminarlo
+                like_obj.delete()
+                return Response(
+                    {
+                        "articulo": articulo.id,
+                        "usuario": user.id,
+                        "liked": False,
+                        "likes_count": articulo.likes.count(),
+                        "message": "👍 Like eliminado exitosamente"
+                    },
+                    status=status.HTTP_200_OK
+                )
+        
+        # Si no se especifica action, comportamiento toggle (para compatibilidad)
         else:
-            # Si no existe, crearlo (dar like)
-            LikeArticulo.objects.create(articulo=articulo, usuario=user)
-            liked = True
-            message = "👍 Like agregado"
+            if like_obj:
+                # Si existe, eliminarlo (quitar like)
+                like_obj.delete()
+                liked = False
+                message = "👍 Like eliminado"
+            else:
+                # Si no existe, crearlo (dar like)
+                LikeArticulo.objects.create(articulo=articulo, usuario=user)
+                liked = True
+                message = "👍 Like agregado"
 
+            return Response(
+                {
+                    "articulo": articulo.id,
+                    "usuario": user.id,
+                    "liked": liked,
+                    "likes_count": articulo.likes.count(),
+                    "message": message
+                },
+                status=status.HTTP_200_OK
+            )
+
+    @extend_schema(
+        tags=["Artículos - Reacciones"],
+        description="Obtener lista de usuarios que dieron like a un artículo específico."
+    )
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def likes_list(self, request, pk=None):
+        """
+        Endpoint para obtener la lista de usuarios que dieron like a un artículo específico.
+        
+        Permite al frontend:
+        - Validar si el usuario autenticado está en la lista
+        - Mostrar el corazón en rojo si ya dio like
+        - Obtener información de todos los usuarios que dieron like
+        
+        Respuesta incluye:
+        - Lista de usuarios con información básica (id, email, usuario_unico)
+        - Total de likes
+        - Estado del usuario autenticado (si está logueado)
+        """
+        articulo = get_object_or_404(Articulos, pk=pk)
+        
+        # Obtener todos los likes del artículo
+        likes = LikeArticulo.objects.filter(articulo=articulo).select_related('usuario').order_by('-creado_en')
+        
+        # Serializar la información de los usuarios
+        from .serializers import LikeArticuloSerializer
+        likes_data = LikeArticuloSerializer(likes, many=True).data
+        
+        # Información del usuario autenticado si está logueado
+        user_liked = False
+        user_info = None
+        
+        if request.user.is_authenticated:
+            user_like = LikeArticulo.objects.filter(articulo=articulo, usuario=request.user).first()
+            user_liked = bool(user_like)
+            user_info = {
+                "id": request.user.id,
+                "email": request.user.email,
+                "usuario_unico": request.user.usuario_unico,
+                "liked": user_liked
+            }
+        
         return Response(
             {
-                "articulo": articulo.id,
-                "usuario": user.id,
-                "liked": liked,
-                "likes_count": articulo.likes.count(),
-                "message": message
+                "articulo": {
+                    "id": articulo.id,
+                    "titulo": articulo.titulo_articulo,
+                    "likes_count": likes.count()
+                },
+                "likes_list": likes_data,
+                "current_user": user_info,
+                "user_liked": user_liked,
+                "total_likes": likes.count()
             },
             status=status.HTTP_200_OK
         )
@@ -119,6 +249,11 @@ class ComentarioArticuloViewSet(viewsets.ModelViewSet):
         "contenido": "Mi comentario aquí",
         "parent": ""  // o ID del comentario padre para respuestas
     }
+    
+    ✅ LIBERTAD DE COMENTARIOS:
+    - Los usuarios pueden comentar MÚLTIPLES veces en cualquier artículo
+    - Pueden responder a cualquier comentario sin restricciones
+    - Fomenta conversaciones dinámicas e interacciones ricas
     """
     queryset = ComentarioArticulo.objects.filter(parent__isnull=True).order_by('-creado_en')
     serializer_class = ComentarioArticuloSerializer
@@ -130,5 +265,10 @@ class ComentarioArticuloViewSet(viewsets.ModelViewSet):
     search_fields = ['contenido']
 
     def perform_create(self, serializer):
-        """Crear comentario asociado al usuario autenticado"""
+        """
+        Crear comentario asociado al usuario autenticado.
+        
+        ✅ PERMITIDO: Los usuarios pueden comentar múltiples veces en artículos.
+        Esto fomenta conversaciones e interacciones más dinámicas.
+        """
         serializer.save(autor=self.request.user)

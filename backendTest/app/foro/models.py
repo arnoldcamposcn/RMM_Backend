@@ -9,12 +9,19 @@ class Tema(models.Model):
     """
     Modelo para los temas (foros) creados por los usuarios.
     """
-    titulo = models.CharField("Título del tema", max_length=255)
-    contenido = models.TextField("Contenido del tema")
+    titulo = models.CharField("Título del tema", max_length=1000, null=True)
+    contenido = models.TextField("Contenido del tema", unique=True, blank=True, null=True)
     autor = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="temas_foro"
+    )
+    categoria_foro = models.ForeignKey(
+        "Categoria_Foro",
+        on_delete=models.CASCADE,
+        related_name="temas",
+        verbose_name="Categoría del foro",
+        help_text="Selecciona la categoría a la que pertenece este tema"
     )
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -26,7 +33,6 @@ class Tema(models.Model):
 
     def __str__(self):
         return self.titulo
-
 
 class Categoria_Foro(models.Model):
     nombre_categoria = models.CharField("Nombre de la categoría", max_length=200, unique=True)

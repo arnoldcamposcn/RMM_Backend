@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Blog, ComentarioBlog, LikeBlog, Categoria_Blog
+from app.articles.serializers import ArticuloSerializer
 
 User = get_user_model()
 
@@ -41,6 +42,8 @@ class LikeBlogSerializer(serializers.ModelSerializer):
     Serializer para likes de blogs.
     Solo 'me gusta' - sin 'no me gusta'.
     """
+    usuario = AutorBlogSerializer(read_only=True)  # Incluir información detallada del usuario
+    
     class Meta:
         model = LikeBlog
         fields = ["id", "usuario", "creado_en"]
@@ -90,12 +93,13 @@ class BlogSerializer(serializers.ModelSerializer):
     categoria_blog = CategoriaBlogSerializer(read_only=True)
     comentarios = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
+    articulos = ArticuloSerializer(many=True, read_only=True)  # 👈 se agregaron artículos aquí
 
     class Meta:
         model = Blog
         fields = [
             "id", "titulo_blog", "contenido", "imagen_principal", "banner", "fecha_publicacion",
-            "categoria_blog", "comentarios", "likes_count"
+            "categoria_blog", "comentarios", "likes_count", "articulos"
         ]
 
     def get_comentarios(self, obj):

@@ -31,14 +31,12 @@ class TemaViewSet(viewsets.ModelViewSet):
     """
     ViewSet para listar, crear, actualizar y eliminar temas del foro.
     
-    ⚠️ RESTRICCIÓN DE CREACIÓN:
-    - Un usuario solo puede crear UN tema en el foro
-    - Esto mantiene la calidad y evita spam de temas
-    
-    ✅ LIBERTAD DE PARTICIPACIÓN:
+    ✅ LIBERTAD TOTAL DE PARTICIPACIÓN:
+    - Los usuarios pueden crear MÚLTIPLES temas en el foro
     - Todos pueden comentar múltiples veces en cualquier tema
     - Solo el autor puede editar/eliminar su propio tema
     - Sistema de likes para temas
+    - Fomenta la participación activa y diversidad de contenido
     """
     queryset = Tema.objects.all().order_by("-creado_en")
     serializer_class = TemaSerializer
@@ -53,23 +51,10 @@ class TemaViewSet(viewsets.ModelViewSet):
         """
         Crear tema asociado al usuario autenticado.
         
-        ⚠️ RESTRICCIÓN: Un usuario solo puede crear UN tema en el foro.
-        Si intenta crear otro tema, se rechaza la solicitud.
+        ✅ LIBERTAD TOTAL: Los usuarios pueden crear múltiples temas en el foro.
+        Esto fomenta la participación activa y diversidad de contenido.
         """
-        user = self.request.user
-        
-        # Verificar si el usuario ya creó un tema
-        existing_tema = Tema.objects.filter(autor=user).exists()
-        
-        if existing_tema:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({
-                'error': 'Ya has creado un tema anteriormente.',
-                'message': 'Solo se permite crear un tema por usuario en el foro.',
-                'code': 'DUPLICATE_TEMA'
-            })
-        
-        serializer.save(autor=user)
+        serializer.save(autor=self.request.user)
 
     @extend_schema(
         tags=["Foro - Reacciones"],

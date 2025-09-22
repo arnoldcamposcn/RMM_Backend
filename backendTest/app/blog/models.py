@@ -10,16 +10,18 @@ User = settings.AUTH_USER_MODEL
 class Blog(models.Model):
     titulo_blog = models.CharField("Título del blog", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
-    imagen_principal = models.ImageField("Imagen", upload_to="blogs/")
-    banner = models.ImageField("Banner", upload_to="banners/")
+    imagen_principal = models.ImageField("Imagen", upload_to="blogs/", null=True, blank=True)
+    banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
     fecha_publicacion = models.DateField("Fecha de publicación")
-    # categoria_blog = models.ForeignKey(
-    #     'Categoria_Blog',
-    #     on_delete=models.CASCADE,
-    #     related_name="blogs",
-    #     verbose_name="Categoría del blog",
-    #     help_text="Selecciona la categoría a la que pertenece este blog"
-    # )
+    categoria_blog = models.ForeignKey(
+        'Categoria_Blog',
+        on_delete=models.CASCADE,
+        related_name="blogs",
+        verbose_name="Categoría del blog",
+        help_text="Selecciona la categoría a la que pertenece este blog",
+        null=True,
+        blank=True,
+    )
     # articulos = models.ManyToManyField(Articulos, blank=True, related_name="blogs")  # 👈 Relación ManyToMany
     articulos = models.ManyToManyField("articles.Articulos", blank=True, related_name="blogs")
 

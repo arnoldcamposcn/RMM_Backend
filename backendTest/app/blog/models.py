@@ -13,13 +13,13 @@ class Blog(models.Model):
     imagen_principal = models.ImageField("Imagen", upload_to="blogs/")
     banner = models.ImageField("Banner", upload_to="banners/")
     fecha_publicacion = models.DateField("Fecha de publicación")
-    categoria_blog = models.ForeignKey(
-        'Categoria_Blog',
-        on_delete=models.CASCADE,
-        related_name="blogs",
-        verbose_name="Categoría del blog",
-        help_text="Selecciona la categoría a la que pertenece este blog"
-    )
+    # categoria_blog = models.ForeignKey(
+    #     'Categoria_Blog',
+    #     on_delete=models.CASCADE,
+    #     related_name="blogs",
+    #     verbose_name="Categoría del blog",
+    #     help_text="Selecciona la categoría a la que pertenece este blog"
+    # )
     # articulos = models.ManyToManyField(Articulos, blank=True, related_name="blogs")  # 👈 Relación ManyToMany
     articulos = models.ManyToManyField("articles.Articulos", blank=True, related_name="blogs")
 

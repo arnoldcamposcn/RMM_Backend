@@ -202,3 +202,42 @@ class UserSimpleSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'usuario_unico', 'perfil_completo']
 
 
+
+# ======================================================================
+# SERIALIZERS DE RECUPERACIÓN DE CONTRASEÑA
+# ======================================================================
+
+class RequestPasswordResetSerializer(serializers.Serializer):
+    """
+    Valida que el email se envíe correctamente
+    """
+    email = serializers.EmailField()
+
+    
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    """
+    Valida los datos que llegan para restablecer contraseña
+    """
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(min_length=8, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, write_only=True)
+
+    def validate(self, attrs):
+        """Validar que las contraseñas coincidan"""
+        new_password = attrs.get('new_password')
+        confirm_password = attrs.get('confirm_password')
+        
+        if new_password != confirm_password:
+            raise serializers.ValidationError({
+                'confirm_password': 'Las contraseñas no coinciden.'
+            })
+        
+        # Validar fortaleza de la contraseña
+        if new_password:
+            try:
+                validate_password(new_password)
+            except ValidationError as e:
+                raise serializers.ValidationError({'new_password': e.messages})
+        
+        return attrs

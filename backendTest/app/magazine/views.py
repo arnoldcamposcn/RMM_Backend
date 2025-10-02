@@ -14,7 +14,7 @@ from .pagination import WeeklyEditionPagination
     tags=["Ediciones"],
     description="Endpoints para consultar las ediciones de la revista."
 )
-class EdicionesViewSet(viewsets.ReadOnlyModelViewSet):
+class EdicionesViewSet(viewsets.ModelViewSet):
     queryset = Ediciones.objects.all()
     serializer_class = EdicionesSerializer
     permission_classes = [permissions.AllowAny]
@@ -47,6 +47,11 @@ class EdicionesViewSet(viewsets.ReadOnlyModelViewSet):
         if page is not None:
             return self.get_paginated_response(self.get_serializer(page, many=True).data)
         return Response(self.get_serializer(ediciones, many=True).data)
+    
+    def get_permissions(self):
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
 
 
 # ----------------------------

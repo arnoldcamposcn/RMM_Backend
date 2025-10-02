@@ -329,7 +329,12 @@ class ComentarioTemaViewSet(viewsets.ModelViewSet):
         Filtra comentarios principales y permite filtrado por tema.
         Optimiza las consultas con select_related para el autor.
         """
-        queryset = ComentarioTema.objects.filter(parent__isnull=True).select_related('autor', 'tema').order_by('-creado_en')
+        queryset = ComentarioTema.objects.all().select_related('autor', 'tema').prefetch_related(
+            'respuestas__autor',
+            'respuestas__respuestas__autor',
+            'respuestas__respuestas__respuestas__autor',
+            'respuestas__respuestas__respuestas__respuestas__autor'
+        ).order_by('-creado_en')
         
         # Filtrar por tema si se proporciona el parámetro
         tema_id = self.request.query_params.get('tema')

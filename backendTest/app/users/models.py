@@ -11,6 +11,13 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("El email es obligatorio")
         email = self.normalize_email(email)
+        
+        # Generar usuario_unico si no se proporciona
+        if 'usuario_unico' not in extra_fields or not extra_fields['usuario_unico']:
+            # Crear un usuario temporal para generar el usuario_unico
+            temp_user = self.model(email=email, **extra_fields)
+            extra_fields['usuario_unico'] = temp_user.generar_usuario_unico()
+        
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)

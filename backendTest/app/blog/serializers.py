@@ -51,14 +51,7 @@ class LikeBlogSerializer(serializers.ModelSerializer):
 
 
 class ComentarioBlogSerializer(serializers.ModelSerializer):
-    """
-    Serializer para comentarios de blogs.
-    Los comentarios ya no tienen sistema de likes individual.
     
-    Para crear comentarios:
-    - Comentario independiente: parent = "" (string vacío) o no incluir el campo
-    - Respuesta a comentario: parent = ID del comentario padre (ejemplo: parent = 5)
-    """
     autor = AutorBlogSerializer(read_only=True)
     respuestas = serializers.SerializerMethodField()
     parent = OptionalParentFieldBlog(
@@ -69,31 +62,39 @@ class ComentarioBlogSerializer(serializers.ModelSerializer):
         help_text="ID del comentario padre. Dejar vacío (\"\") para comentario independiente, o número para responder."
     )
 
+    # Nuevo campo de nivel
+    nivel = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = ComentarioBlog
         fields = [
-            "id", "blog", "autor", "contenido", "parent",
-            "creado_en", "respuestas"
+            "id", "blog", "autor", "contenido", "parent", "nivel", "creado_en", "respuestas"
         ]
-        read_only_fields = ["autor", "creado_en", "respuestas"]
+        read_only_fields = ["autor", "nivel", "creado_en", "respuestas"]
+
+    def validate_parent(self, value):
+        if value and value.nivel >= ComentarioBlog.MAX_DEPTH:
+            raise serializers.ValidationError(f"No se puede responder a un comentario de nivel {ComentarioBlog.MAX_DEPTH}.")
+        return value
 
     def get_respuestas(self, obj):
-        """Traer respuestas en forma anidada"""
+        # Se optimiza para evitar N+1 queries usando prefetch_related en view
         return ComentarioBlogSerializer(
-            obj.respuestas.all(), 
-            many=True, 
+            obj.respuestas.all().order_by("-creado_en"),
+            many=True,
             context=self.context
         ).data
 
+    def create(self, validated_data):
+        validated_data["autor"] = self.context["request"].user
+        return super().create(validated_data)
+
 
 class BlogSerializer(serializers.ModelSerializer):
-    """
-    Serializer para blogs con sistema de likes.
-    """
     categoria_blog = CategoriaBlogSerializer(read_only=True)
     comentarios = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
-    articulos = ArticuloSerializer(many=True, read_only=True)  # 👈 se agregaron artículos aquí
+    articulos = ArticuloSerializer(many=True, read_only=True)
 
     class Meta:
         model = Blog
@@ -103,14 +104,13 @@ class BlogSerializer(serializers.ModelSerializer):
         ]
 
     def get_comentarios(self, obj):
-        """Solo comentarios principales (sin parent), con sus respuestas anidadas"""
         comentarios_principales = obj.comentarios.filter(parent__isnull=True)
         return ComentarioBlogSerializer(
-            comentarios_principales, 
-            many=True, 
+            comentarios_principales,
+            many=True,
             context=self.context
         ).data
 
     def get_likes_count(self, obj):
-        """Cantidad total de 'me gusta'"""
         return obj.likes.count()
+

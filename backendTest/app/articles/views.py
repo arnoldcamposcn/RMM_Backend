@@ -20,7 +20,7 @@ from drf_spectacular.utils import extend_schema
     tags=["Artículos - listar"],
     description="Endpoints para consultar artículos con paginación y búsqueda (solo lectura)."
 )
-class ArticuloViewSet(viewsets.ReadOnlyModelViewSet):
+class ArticuloViewSet(viewsets.ModelViewSet):
     """
     ViewSet SOLO DE LECTURA para listar y ver detalles de artículos.
     
@@ -166,6 +166,12 @@ class ArticuloViewSet(viewsets.ReadOnlyModelViewSet):
                 },
                 status=status.HTTP_200_OK
             )
+            
+    def get_permissions(self):
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
+
 
     @extend_schema(
         tags=["Artículos - Reacciones"],
@@ -367,24 +373,33 @@ class ComentarioArticuloViewSet(viewsets.ModelViewSet):
     search_fields = ['contenido']
 
     def get_queryset(self):
-        """
-        Filtra comentarios principales y permite filtrado por artículo.
-        Optimiza las consultas con select_related para el autor.
-        """
-        queryset = ComentarioArticulo.objects.filter(parent__isnull=True).select_related('autor', 'articulo').order_by('-creado_en')
-        
-        # Filtrar por artículo si se proporciona el parámetro
+        qs = ComentarioArticulo.objects.all().select_related('autor', 'articulo').prefetch_related(
+            'respuestas__autor', 
+            'respuestas__respuestas__autor',
+            'respuestas__respuestas__respuestas__autor',
+            'respuestas__respuestas__respuestas__respuestas__autor'
+        ).order_by('-creado_en')
+
         articulo_id = self.request.query_params.get('articulo')
         if articulo_id:
-            queryset = queryset.filter(articulo=articulo_id)
-            
-        return queryset
+            qs = qs.filter(articulo=articulo_id)
+        return qs
+
 
     def perform_create(self, serializer):
-        """
-        Crear comentario asociado al usuario autenticado.
-        
-        ✅ PERMITIDO: Los usuarios pueden comentar múltiples veces en artículos.
-        Esto fomenta conversaciones e interacciones más dinámicas.
-        """
         serializer.save(autor=self.request.user)
+
+
+    @extend_schema(
+        tags=["Artículos - Comentarios"],
+        description="Lista todos los comentarios principales de un artículo específico con paginación."
+    )
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def children(self, request, pk=None):
+        comentario = get_object_or_404(ComentarioArticulo, pk=pk)
+        hijos = comentario.respuestas.all().select_related('autor')
+        
+        paginator = ArticulosPagination()
+        page = paginator.paginate_queryset(hijos, request, view=self)
+        ser = ComentarioArticuloSerializer(page or hijos, many=True, context={"request": request})
+        return paginator.get_paginated_response(ser.data) if page is not None else Response(ser.data, status=200)

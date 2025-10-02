@@ -1,22 +1,21 @@
 from django.db import models
 from django.conf import settings
 from ckeditor.fields import RichTextField
-
+from django.core.exceptions import ValidationError
 
 User = settings.AUTH_USER_MODEL
-
 
 class Articulos(models.Model):
     titulo_articulo = models.CharField("Título del artículo", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
     imagen_principal = models.ImageField("Imagen", upload_to="articulos/", null=True, blank=True)
     banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
-    fecha_publicacion = models.DateField("Fecha de publicación")
+    fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
     categoria_articulo = models.ForeignKey(
         'blog.Categoria_Blog',
         on_delete=models.CASCADE,
         related_name="articulos",
-        verbose_name="Categoría del artículo",
+        verbose_name="Categoría",
         help_text="Selecciona la categoría a la que pertenece este artículo",
         null=True,
         blank=True
@@ -32,6 +31,7 @@ class Articulos(models.Model):
 
 
 class ComentarioArticulo(models.Model):
+    MAX_DEPTH = 5  # Límite de profundidad
     articulo = models.ForeignKey(
         Articulos, on_delete=models.CASCADE, related_name="comentarios"
     )
@@ -44,8 +44,25 @@ class ComentarioArticulo(models.Model):
     )
     creado_en = models.DateTimeField(auto_now_add=True)
 
+    nivel = models.PositiveIntegerField(default=0, editable=False)
+
     class Meta:
         ordering = ["-creado_en"]
+        indexes = [
+            models.Index(fields=["articulo", "parent"]),
+            models.Index(fields=["articulo", "nivel"]),
+        ]
+
+    def clean(self):
+        # Verificar que no exceda el nivel máximo
+        if self.parent:
+            self.nivel = self.parent.nivel + 1
+        if self.nivel > self.MAX_DEPTH:
+            raise ValidationError(f"No se permite crear comentarios más profundos de {self.MAX_DEPTH} niveles.")
+
+    def save(self, *args, **kwargs):
+        self.clean()  # Validar y establecer nivel
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Comentario de {self.autor} en {self.articulo}"

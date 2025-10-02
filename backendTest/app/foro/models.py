@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
+from django.core.exceptions import ValidationError
 
 User = settings.AUTH_USER_MODEL
 
@@ -57,6 +58,7 @@ class Categoria_Foro(models.Model):
 
 
 class ComentarioTema(models.Model):
+    MAX_DEPTH = 5  # Límite de profundidad
     """
     Comentarios hechos en un tema del foro.
     """
@@ -72,8 +74,26 @@ class ComentarioTema(models.Model):
     )
     creado_en = models.DateTimeField(auto_now_add=True)
 
+    # Nuevo campo para controlar la profundidad
+    nivel = models.PositiveIntegerField(default=0, editable=False)
+
     class Meta:
         ordering = ["-creado_en"]
+        indexes = [
+            models.Index(fields=["tema", "parent"]),
+            models.Index(fields=["tema", "nivel"]),
+        ]
+
+    def clean(self):
+        # Verificar que no exceda el nivel máximo
+        if self.parent:
+            self.nivel = self.parent.nivel + 1
+        if self.nivel > self.MAX_DEPTH:
+            raise ValidationError(f"No se permite crear comentarios más profundos de {self.MAX_DEPTH} niveles.")
+
+    def save(self, *args, **kwargs):
+        self.clean()  # Validar y establecer nivel
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Comentario de {self.autor} en {self.tema}"

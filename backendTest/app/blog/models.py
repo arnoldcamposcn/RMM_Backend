@@ -8,16 +8,16 @@ User = settings.AUTH_USER_MODEL
 
 
 class Blog(models.Model):
-    titulo_blog = models.CharField("Título del blog", max_length=200)
+    titulo_blog = models.CharField("Título del noticia", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
     imagen_principal = models.ImageField("Imagen", upload_to="blogs/", null=True, blank=True)
     banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
-    fecha_publicacion = models.DateField("Fecha de publicación")
+    fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
     categoria_blog = models.ForeignKey(
         'Categoria_Blog',
         on_delete=models.CASCADE,
         related_name="blogs",
-        verbose_name="Categoría del blog",
+        verbose_name="Categoría",
         help_text="Selecciona la categoría a la que pertenece este blog",
         null=True,
         blank=True,
@@ -28,15 +28,15 @@ class Blog(models.Model):
 
     class Meta:
         ordering = ["-fecha_publicacion"]
-        verbose_name = "Blog"
-        verbose_name_plural = "Blogs"
+        verbose_name = "Noticia"
+        verbose_name_plural = "Noticias"
 
     def __str__(self):
         return self.titulo_blog
 
 
 class Categoria_Blog(models.Model):
-    nombre_categoria = models.CharField("Nombre de la categoría", max_length=200, unique=True)
+    nombre_categoria = models.CharField("Nombre de la noticias", max_length=200, unique=True)
     slug = models.SlugField("Slug", unique=True, blank=True, editable=False)
 
     class Meta:
@@ -53,7 +53,10 @@ class Categoria_Blog(models.Model):
         super().save(*args, **kwargs)
 
 
+
 class ComentarioBlog(models.Model):
+    MAX_DEPTH = 5  # Límite de profundidad
+
     blog = models.ForeignKey(
         Blog, on_delete=models.CASCADE, related_name="comentarios"
     )
@@ -66,8 +69,26 @@ class ComentarioBlog(models.Model):
     )
     creado_en = models.DateTimeField(auto_now_add=True)
 
+    # Nuevo campo para controlar la profundidad
+    nivel = models.PositiveIntegerField(default=0, editable=False)
+
     class Meta:
         ordering = ["-creado_en"]
+        indexes = [
+            models.Index(fields=["blog", "parent"]),
+            models.Index(fields=["blog", "nivel"]),
+        ]
+
+    def clean(self):
+        # Verificar que no exceda el nivel máximo
+        if self.parent:
+            self.nivel = self.parent.nivel + 1
+        if self.nivel > self.MAX_DEPTH:
+            raise ValidationError(f"No se permite crear comentarios más profundos de {self.MAX_DEPTH} niveles.")
+
+    def save(self, *args, **kwargs):
+        self.clean()  # Validar y establecer nivel
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Comentario de {self.autor} en {self.blog}"

@@ -52,14 +52,7 @@ class LikeArticuloSerializer(serializers.ModelSerializer):
 
 
 class ComentarioArticuloSerializer(serializers.ModelSerializer):
-    """
-    Serializer para comentarios de artículos.
-    Los comentarios ya no tienen sistema de likes individual.
-    
-    Para crear comentarios:
-    - Comentario independiente: parent = "" (string vacío) o no incluir el campo
-    - Respuesta a comentario: parent = ID del comentario padre (ejemplo: parent = 5)
-    """
+
     autor = AutorArticuloSerializer(read_only=True)
     respuestas = serializers.SerializerMethodField()
     parent = OptionalParentField(
@@ -69,22 +62,31 @@ class ComentarioArticuloSerializer(serializers.ModelSerializer):
         default="",
         help_text="ID del comentario padre. Dejar vacío (\"\") para comentario independiente, o número para responder."
     )
+    nivel = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ComentarioArticulo
         fields = [
-            "id", "articulo", "autor", "contenido", "parent",
-            "creado_en", "respuestas"
+            "id", "articulo", "autor", "contenido", "parent" , "nivel", "creado_en", "respuestas"    
         ]
-        read_only_fields = ["autor", "creado_en", "respuestas"]
+        read_only_fields = ["autor", "nivel", "creado_en", "respuestas"]
+
+    def validate_parent(self, value):
+        if value and value.nivel >= ComentarioArticulo.MAX_DEPTH:
+            raise serializers.ValidationError(f"No se puede responder a un comentario de nivel {ComentarioArticulo.MAX_DEPTH}.")
+        return value
 
     def get_respuestas(self, obj):
         """Traer respuestas en forma anidada"""
         return ComentarioArticuloSerializer(
-            obj.respuestas.all(), 
+            obj.respuestas.all().order_by("-creado_en"), 
             many=True, 
             context=self.context
         ).data
+    
+    def create(self, validated_data):
+        validated_data["autor"] = self.context["request"].user
+        return super().create(validated_data)
 
 
 class ArticuloSerializer(serializers.ModelSerializer):

@@ -62,18 +62,26 @@ class ComentarioTemaSerializer(serializers.ModelSerializer):
         default="",
         help_text="ID del comentario padre. Dejar vacío para comentario independiente."
     )
+    
+    # Nuevo campo para el nivel de anidación
+    nivel = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ComentarioTema
         fields = [
-            "id", "tema", "autor", "contenido", "parent",
+            "id", "tema", "autor", "contenido", "parent", "nivel",
             "creado_en", "respuestas", "likes_count"
         ]
-        read_only_fields = ["autor", "creado_en", "respuestas", "likes_count"]
+        read_only_fields = ["autor", "nivel", "creado_en", "respuestas", "likes_count"]
+
+    def validate_parent(self, value):
+        if value and value.nivel >= ComentarioTema.MAX_DEPTH:
+            raise serializers.ValidationError(f"No se puede responder a un comentario de nivel {ComentarioTema.MAX_DEPTH}.")
+        return value
 
     def get_respuestas(self, obj):
         return ComentarioTemaSerializer(
-            obj.respuestas.all(),
+            obj.respuestas.all().order_by("-creado_en"),
             many=True,
             context=self.context
         ).data
@@ -81,6 +89,10 @@ class ComentarioTemaSerializer(serializers.ModelSerializer):
     def get_likes_count(self, obj):
         """Cantidad total de 'me gusta' en este comentario"""
         return obj.likes.count()
+    
+    def create(self, validated_data):
+        validated_data["autor"] = self.context["request"].user
+        return super().create(validated_data)
 
 
 class TemaSerializer(serializers.ModelSerializer):

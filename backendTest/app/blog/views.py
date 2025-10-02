@@ -21,7 +21,7 @@ from app.articles.serializers import ArticuloSerializer
     tags=["Blogs - listar"],
     description="Endpoints para consultar blogs con paginación y búsqueda (solo lectura)."
 )
-class BlogViewSet(viewsets.ReadOnlyModelViewSet):
+class BlogViewSet(viewsets.ModelViewSet):
     """
     ViewSet SOLO DE LECTURA para listar y ver detalles de blogs.
 
@@ -162,6 +162,11 @@ class BlogViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_200_OK
             )
 
+    def get_permissions(self):
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
+
     @extend_schema(
         tags=["Blogs - Reacciones"],
         description="Obtener lista de usuarios que dieron like a un blog específico."
@@ -234,6 +239,14 @@ class BlogViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = ArticuloSerializer(articulos, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+
+
+
+
+
+
+
     @extend_schema(
         tags=["Blogs - Comentarios"],
         description="Lista todos los comentarios principales de un blog específico con paginación."
@@ -276,78 +289,37 @@ class BlogViewSet(viewsets.ReadOnlyModelViewSet):
 # ==========================
 # COMENTARIOS
 # ==========================
-@extend_schema(
-    tags=["Blogs - Comentarios"],
-    description="Endpoints para consultar y crear comentarios con paginación y búsqueda."
-)
+# ==========================
+# COMENTARIOS
+# ==========================
+@extend_schema(tags=["Blogs - Comentarios"], description="CRUD de comentarios (todos los niveles).")
 class ComentarioBlogViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet para listar, crear, actualizar y eliminar comentarios de blogs.
-    
-    ⚠️ IMPORTANTE: Solo muestra comentarios principales (sin parent).
-    Las respuestas aparecen anidadas en el campo 'respuestas' de cada comentario padre.
-    
-    📋 FILTRADO POR BLOG:
-    - Filtra automáticamente los comentarios según el blogId recibido
-    - Mantiene toda la información del autor, contenido, fecha y respuestas
-    - Incluye paginación para optimizar la carga de datos
-    
-    Funcionalidades:
-    - 🔍 Búsqueda: ?search=término (busca en el contenido del comentario)
-    - 📄 Paginación: usa la configuración global de settings (5 comentarios por página)
-    - 🎯 Filtro por blog: ?blog=1 (REQUERIDO para filtrar por blog específico)
-    
-    Ejemplos de uso:
-    - GET /api/v1/blog/comentarios/?blog=1 - Comentarios principales del blog 1
-    - GET /api/v1/blog/comentarios/?blog=1&page=2 - Segunda página del blog 1
-    - GET /api/v1/blog/comentarios/?blog=1&search=excelente - Buscar en blog 1
-    - POST /api/v1/blog/comentarios/ - Crear comentario
-    
-    Payload para crear comentario:
-    {
-        "blog": 1,
-        "contenido": "Mi comentario aquí",
-        "parent": ""  // o ID del comentario padre para respuestas
-    }
-    
-    ✅ LIBERTAD DE COMENTARIOS:
-    - Los usuarios pueden comentar MÚLTIPLES veces en cualquier blog
-    - Pueden responder a cualquier comentario sin restricciones
-    - Fomenta conversaciones dinámicas e interacciones ricas
-    
-    Respuesta incluye:
-    - Información completa del autor (email, usuario_unico)
-    - Contenido y fecha de creación
-    - Respuestas anidadas con la misma estructura
-    - Paginación automática
-    """
     serializer_class = ComentarioBlogSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    
-    # Configuración de filtros y búsqueda
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['blog', 'parent']
     search_fields = ['contenido']
 
     def get_queryset(self):
-        """
-        Filtra comentarios principales y permite filtrado por blog.
-        Optimiza las consultas con select_related para el autor.
-        """
-        queryset = ComentarioBlog.objects.filter(parent__isnull=True).select_related('autor', 'blog').order_by('-creado_en')
-        
-        # Filtrar por blog si se proporciona el parámetro
+        qs = ComentarioBlog.objects.all().select_related('autor', 'blog').prefetch_related(
+            'respuestas__autor', 'respuestas__respuestas__autor'
+        ).order_by('-creado_en')
+
         blog_id = self.request.query_params.get('blog')
         if blog_id:
-            queryset = queryset.filter(blog=blog_id)
-            
-        return queryset
+            qs = qs.filter(blog=blog_id)
+        return qs
 
     def perform_create(self, serializer):
-        """
-        Crear comentario asociado al usuario autenticado.
-        
-        ✅ PERMITIDO: Los usuarios pueden comentar múltiples veces en blogs.
-        Esto fomenta conversaciones e interacciones más dinámicas.
-        """
         serializer.save(autor=self.request.user)
+
+    @extend_schema(tags=["Blogs - Comentarios"], description="Lista paginada de respuestas directas de un comentario (1 nivel).")
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def children(self, request, pk=None):
+        comentario = get_object_or_404(ComentarioBlog, pk=pk)
+        hijos = comentario.respuestas.all().select_related('autor')
+
+        paginator = BlogPagination()
+        page = paginator.paginate_queryset(hijos, request, view=self)
+        ser = ComentarioBlogSerializer(page or hijos, many=True, context={"request": request})
+        return paginator.get_paginated_response(ser.data) if page is not None else Response(ser.data, status=200)

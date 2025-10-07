@@ -8,14 +8,14 @@ class ArticulosAdmin(admin.ModelAdmin):
     Solo administradores pueden crear/editar artículos.
     Las categorías se gestionan desde Blog/Categorías y se reutilizan aquí.
     """
-    list_display = ('titulo_articulo', 'categoria_articulo', 'fecha_publicacion', 'id')
-    list_filter = ('fecha_publicacion', 'categoria_articulo')
-    search_fields = ('titulo_articulo', 'contenido', 'categoria_articulo__nombre_categoria')
+    list_display = ('titulo_articulo', 'fecha_publicacion', 'id')
+    list_filter = ('fecha_publicacion',)
+    search_fields = ('titulo_articulo', 'contenido')
     ordering = ('-fecha_publicacion',)
     
     fieldsets = (
         ('Información del Artículo', {
-            'fields': ('titulo_articulo', 'categoria_articulo', 'contenido', 'fecha_publicacion')
+            'fields': ('titulo_articulo', 'contenido', 'fecha_publicacion')
         }),
         ('Imágenes', {
             'fields': ('imagen_principal', 'banner'),

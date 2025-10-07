@@ -239,6 +239,114 @@ class BlogViewSet(viewsets.ModelViewSet):
         serializer = ArticuloSerializer(articulos, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        tags=["Blogs - Artículos"],
+        description="Gestiona los artículos asociados a un blog específico."
+    )
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
+    def manage_articulos(self, request, pk=None):
+        """
+        Endpoint para gestionar artículos de un blog.
+        
+        Permite:
+        - Agregar artículos: {"action": "add", "articulos_ids": [1, 2, 3]}
+        - Remover artículos: {"action": "remove", "articulos_ids": [1, 2]}
+        - Reemplazar todos: {"action": "set", "articulos_ids": [1, 2, 3]}
+        - Limpiar todos: {"action": "clear"}
+        """
+        blog = get_object_or_404(Blog, pk=pk)
+        action = request.data.get('action')
+        articulos_ids = request.data.get('articulos_ids', [])
+        
+        if action == "add":
+            # Agregar artículos sin remover los existentes
+            from app.articles.models import Articulos
+            articulos = Articulos.objects.filter(id__in=articulos_ids)
+            blog.articulos.add(*articulos)
+            message = f"Artículos {articulos_ids} agregados al blog"
+            
+        elif action == "remove":
+            # Remover artículos específicos
+            from app.articles.models import Articulos
+            articulos = Articulos.objects.filter(id__in=articulos_ids)
+            blog.articulos.remove(*articulos)
+            message = f"Artículos {articulos_ids} removidos del blog"
+            
+        elif action == "set":
+            # Reemplazar todos los artículos
+            from app.articles.models import Articulos
+            articulos = Articulos.objects.filter(id__in=articulos_ids)
+            blog.articulos.set(articulos)
+            message = f"Artículos del blog actualizados: {articulos_ids}"
+            
+        elif action == "clear":
+            # Limpiar todos los artículos
+            blog.articulos.clear()
+            message = "Todos los artículos removidos del blog"
+            
+        else:
+            return Response(
+                {
+                    "error": "Acción no válida",
+                    "message": "Las acciones válidas son: 'add', 'remove', 'set', 'clear'",
+                    "valid_actions": ["add", "remove", "set", "clear"]
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Devolver el blog actualizado con sus artículos
+        serializer = BlogSerializer(blog, context={"request": request})
+        return Response(
+            {
+                "message": message,
+                "blog": serializer.data,
+                "articulos_count": blog.articulos.count()
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @extend_schema(
+        tags=["Blogs - Artículos"],
+        description="Obtiene artículos disponibles y elegidos para un blog específico."
+    )
+    @action(detail=True, methods=["get"], permission_classes=[permissions.IsAdminUser])
+    def articulos_management(self, request, pk=None):
+        """
+        Endpoint para obtener la información necesaria para gestionar artículos de un blog.
+        
+        Útil para crear interfaces tipo Django Admin con:
+        - Artículos disponibles (todos los artículos)
+        - Artículos elegidos (artículos ya asociados al blog)
+        """
+        blog = get_object_or_404(Blog, pk=pk)
+        
+        # Obtener todos los artículos
+        from app.articles.models import Articulos
+        todos_los_articulos = Articulos.objects.all().order_by('-fecha_publicacion')
+        
+        # Obtener artículos ya asociados al blog
+        articulos_elegidos = blog.articulos.all().order_by('-fecha_publicacion')
+        
+        # Serializar los artículos
+        articulos_disponibles_serializer = ArticuloSerializer(todos_los_articulos, many=True, context={"request": request})
+        articulos_elegidos_serializer = ArticuloSerializer(articulos_elegidos, many=True, context={"request": request})
+        
+        return Response(
+            {
+                "blog": {
+                    "id": blog.id,
+                    "titulo_blog": blog.titulo_blog
+                },
+                "articulos_disponibles": articulos_disponibles_serializer.data,
+                "articulos_elegidos": articulos_elegidos_serializer.data,
+                "counts": {
+                    "disponibles": todos_los_articulos.count(),
+                    "elegidos": articulos_elegidos.count()
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+
 
 
 

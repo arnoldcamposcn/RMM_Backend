@@ -10,21 +10,10 @@ User = settings.AUTH_USER_MODEL
 class Blog(models.Model):
     titulo_blog = models.CharField("Título del noticia", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
-    imagen_principal = models.ImageField("Imagen", upload_to="blogs/", null=True, blank=True)
-    banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
+    imagen_principal = models.ImageField("Imagen", null=True, blank=True)
+    banner = models.ImageField("Banner", null=True, blank=True)
     fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
-    categoria_blog = models.ForeignKey(
-        'Categoria_Blog',
-        on_delete=models.CASCADE,
-        related_name="blogs",
-        verbose_name="Categoría",
-        help_text="Selecciona la categoría a la que pertenece este blog",
-        null=True,
-        blank=True,
-    )
-    # articulos = models.ManyToManyField(Articulos, blank=True, related_name="blogs")  # 👈 Relación ManyToMany
     articulos = models.ManyToManyField("articles.Articulos", blank=True, related_name="blogs")
-
 
     class Meta:
         ordering = ["-fecha_publicacion"]
@@ -34,23 +23,6 @@ class Blog(models.Model):
     def __str__(self):
         return self.titulo_blog
 
-
-class Categoria_Blog(models.Model):
-    nombre_categoria = models.CharField("Nombre de la noticias", max_length=200, unique=True)
-    slug = models.SlugField("Slug", unique=True, blank=True, editable=False)
-
-    class Meta:
-        verbose_name = "Categoría"
-        verbose_name_plural = "Categorías"
-        ordering = ["nombre_categoria"]
-
-    def __str__(self):
-        return self.nombre_categoria
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.nombre_categoria)
-        super().save(*args, **kwargs)
 
 
 

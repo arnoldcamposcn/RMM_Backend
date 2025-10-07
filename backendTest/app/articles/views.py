@@ -29,26 +29,21 @@ class ArticuloViewSet(viewsets.ModelViewSet):
     
     Funcionalidades:
     - 🔍 Búsqueda: ?search=término (busca en título y contenido)
-    - 🏷️ Filtrado: ?categoria_articulo=1 (filtra por categoría)
     - 📄 Paginación: 6 artículos por página (?page=1, ?page_size=10)
     - 👁️ Solo lectura: GET /list/ y GET /detail/ disponibles
     
     Ejemplos de uso:
     - GET /api/v1/articles/?search=tecnología
-    - GET /api/v1/articles/?categoria_articulo=1 (filtrar por categoría)
-    - GET /api/v1/articles/?search=python&categoria_articulo=2 (buscar y filtrar)
     - GET /api/v1/articles/?page=2&page_size=10
     - GET /api/v1/articles/1/ (detalle específico)
-    - GET /api/v1/articles/categorias/ (listar categorías disponibles)
     """
-    queryset = Articulos.objects.select_related('categoria_articulo').order_by('-fecha_publicacion')
+    queryset = Articulos.objects.all().order_by('-fecha_publicacion')
     serializer_class = ArticuloSerializer
     permission_classes = [permissions.AllowAny]  # Solo lectura, acceso público
     pagination_class = ArticulosPagination
     
     # Configuración de filtros y búsqueda
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['categoria_articulo']
+    filter_backends = [filters.SearchFilter]
     search_fields = ['titulo_articulo', 'contenido']
 
     @extend_schema(
@@ -270,50 +265,6 @@ class ArticuloViewSet(viewsets.ModelViewSet):
         serializer = ComentarioArticuloSerializer(comentarios, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        tags=["Artículos - Categorías"],
-        description="Obtener lista de todas las categorías disponibles para artículos."
-    )
-    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
-    def categorias(self, request):
-        """
-        Endpoint para obtener todas las categorías disponibles para artículos.
-        
-        Útil para:
-        - Mostrar opciones de filtrado en el frontend
-        - Crear formularios de selección de categoría
-        - Validar categorías existentes
-        
-        Respuesta incluye:
-        - Lista completa de categorías
-        - Total de artículos por categoría
-        - Información de slug para URLs amigables
-        """
-        from app.blog.models import Categoria_Blog
-        from .serializers import CategoriaArticuloSerializer
-        
-        # Obtener todas las categorías con conteo de artículos
-        categorias = Categoria_Blog.objects.all().order_by('nombre_categoria')
-        
-        # Serializar las categorías
-        serializer = CategoriaArticuloSerializer(categorias, many=True)
-        
-        # Agregar información adicional (conteo de artículos por categoría)
-        categorias_data = []
-        for categoria_data in serializer.data:
-            categoria = Categoria_Blog.objects.get(id=categoria_data['id'])
-            categoria_info = categoria_data.copy()
-            categoria_info['total_articulos'] = categoria.articulos.count()
-            categorias_data.append(categoria_info)
-        
-        return Response(
-            {
-                "categorias": categorias_data,
-                "total_categorias": categorias.count(),
-                "info": "Categorías disponibles para filtrar artículos"
-            },
-            status=status.HTTP_200_OK
-        )
 
 
 # ==========================

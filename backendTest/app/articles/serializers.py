@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Articulos, ComentarioArticulo, LikeArticulo
-from app.blog.models import Categoria_Blog
 
 User = get_user_model()
 
@@ -16,14 +15,6 @@ class AutorArticuloSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "usuario_unico"]
 
 
-class CategoriaArticuloSerializer(serializers.ModelSerializer):
-    """
-    Serializer para mostrar categorías de artículos.
-    Reutiliza el modelo Categoria_Blog para mantener consistencia.
-    """
-    class Meta:
-        model = Categoria_Blog
-        fields = ["id", "nombre_categoria", "slug"]
 
 
 class OptionalParentField(serializers.PrimaryKeyRelatedField):
@@ -91,25 +82,16 @@ class ComentarioArticuloSerializer(serializers.ModelSerializer):
 
 class ArticuloSerializer(serializers.ModelSerializer):
     """
-    Serializer para artículos con sistema de likes y categorías.
+    Serializer para artículos con sistema de likes.
     """
     comentarios = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
-    categoria_articulo = CategoriaArticuloSerializer(read_only=True)
-    categoria_articulo_id = serializers.PrimaryKeyRelatedField(
-        queryset=Categoria_Blog.objects.all(),
-        source="categoria_articulo",
-        write_only=True,
-        required=False,
-        allow_null=True,
-        help_text="ID de la categoría del artículo (opcional)"
-    )
 
     class Meta:
         model = Articulos
         fields = [
             "id", "titulo_articulo", "contenido", "imagen_principal", "banner", "fecha_publicacion",
-            "categoria_articulo", "categoria_articulo_id", "comentarios", "likes_count"
+            "comentarios", "likes_count"
         ]
 
     def get_comentarios(self, obj):

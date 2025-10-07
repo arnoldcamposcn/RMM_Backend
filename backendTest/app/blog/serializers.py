@@ -1,18 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Blog, ComentarioBlog, LikeBlog, Categoria_Blog
+from .models import Blog, ComentarioBlog, LikeBlog
 from app.articles.serializers import ArticuloSerializer
 
 User = get_user_model()
-
-
-class CategoriaBlogSerializer(serializers.ModelSerializer):
-    """
-    Serializer para mostrar información de la categoría del blog.
-    """
-    class Meta:
-        model = Categoria_Blog
-        fields = ["id", "nombre_categoria", "slug"]
 
 
 class AutorBlogSerializer(serializers.ModelSerializer):
@@ -91,16 +82,21 @@ class ComentarioBlogSerializer(serializers.ModelSerializer):
 
 
 class BlogSerializer(serializers.ModelSerializer):
-    categoria_blog = CategoriaBlogSerializer(read_only=True)
     comentarios = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
     articulos = ArticuloSerializer(many=True, read_only=True)
+    articulos_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False,
+        help_text="Lista de IDs de artículos a asociar con este blog"
+    )
 
     class Meta:
         model = Blog
         fields = [
             "id", "titulo_blog", "contenido", "imagen_principal", "banner", "fecha_publicacion",
-            "categoria_blog", "comentarios", "likes_count", "articulos"
+            "comentarios", "likes_count", "articulos", "articulos_ids"
         ]
 
     def get_comentarios(self, obj):
@@ -113,4 +109,50 @@ class BlogSerializer(serializers.ModelSerializer):
 
     def get_likes_count(self, obj):
         return obj.likes.count()
+
+    def create(self, validated_data):
+        # Extraer los IDs de artículos
+        articulos_ids = validated_data.pop('articulos_ids', [])
+        
+        # Convertir string a lista si es necesario (para FormData)
+        if isinstance(articulos_ids, str):
+            if articulos_ids:
+                articulos_ids = [int(id.strip()) for id in articulos_ids.split(',') if id.strip()]
+            else:
+                articulos_ids = []
+        
+        # Crear el blog
+        blog = Blog.objects.create(**validated_data)
+        
+        # Asociar los artículos si se proporcionaron IDs
+        if articulos_ids:
+            from app.articles.models import Articulos
+            articulos = Articulos.objects.filter(id__in=articulos_ids)
+            blog.articulos.set(articulos)
+        
+        return blog
+
+    def update(self, instance, validated_data):
+        # Extraer los IDs de artículos
+        articulos_ids = validated_data.pop('articulos_ids', None)
+        
+        # Convertir string a lista si es necesario (para FormData)
+        if isinstance(articulos_ids, str):
+            if articulos_ids:
+                articulos_ids = [int(id.strip()) for id in articulos_ids.split(',') if id.strip()]
+            else:
+                articulos_ids = []
+        
+        # Actualizar los campos del blog
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Actualizar los artículos si se proporcionaron IDs
+        if articulos_ids is not None:
+            from app.articles.models import Articulos
+            articulos = Articulos.objects.filter(id__in=articulos_ids)
+            instance.articulos.set(articulos)
+        
+        return instance
 

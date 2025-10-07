@@ -11,15 +11,6 @@ class Articulos(models.Model):
     imagen_principal = models.ImageField("Imagen", upload_to="articulos/", null=True, blank=True)
     banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
     fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
-    categoria_articulo = models.ForeignKey(
-        'blog.Categoria_Blog',
-        on_delete=models.CASCADE,
-        related_name="articulos",
-        verbose_name="Categoría",
-        help_text="Selecciona la categoría a la que pertenece este artículo",
-        null=True,
-        blank=True
-    )
 
     class Meta:
         ordering = ["-fecha_publicacion"]

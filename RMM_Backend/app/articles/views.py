@@ -8,6 +8,7 @@ from .models import Articulos, ComentarioArticulo, LikeArticulo
 from .serializers import ArticuloSerializer, ComentarioArticuloSerializer, LikeArticuloSerializer
 from .pagination import ArticulosPagination
 from drf_spectacular.utils import extend_schema
+from app.common.filters import AccentInsensitiveSearchFilter
 
 # ----------------------------
 # 📌 PERMISOS PERSONALIZADOS
@@ -29,11 +30,15 @@ class ArticuloViewSet(viewsets.ModelViewSet):
     
     Funcionalidades:
     - 🔍 Búsqueda: ?search=término (busca en título y contenido)
+      ✨ NUEVO: La búsqueda ignora acentos y diacríticos
+      - Buscar "tecnologia" encontrará "tecnología" y "tecnologia"
+      - Buscar "minería" encontrará "mineria" y "minería"
     - 📄 Paginación: 6 artículos por página (?page=1, ?page_size=10)
     - 👁️ Solo lectura: GET /list/ y GET /detail/ disponibles
     
     Ejemplos de uso:
-    - GET /api/v1/articles/?search=tecnología
+    - GET /api/v1/articles/?search=tecnologia (encuentra "tecnología")
+    - GET /api/v1/articles/?search=minería (encuentra "mineria")
     - GET /api/v1/articles/?page=2&page_size=10
     - GET /api/v1/articles/1/ (detalle específico)
     """
@@ -42,8 +47,8 @@ class ArticuloViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.AllowAny]  # Solo lectura, acceso público
     pagination_class = ArticulosPagination
     
-    # Configuración de filtros y búsqueda
-    filter_backends = [filters.SearchFilter]
+    # Configuración de filtros y búsqueda (con soporte para búsqueda sin acentos)
+    filter_backends = [AccentInsensitiveSearchFilter]
     search_fields = ['titulo_articulo', 'contenido']
 
     @extend_schema(
@@ -318,8 +323,8 @@ class ComentarioArticuloViewSet(viewsets.ModelViewSet):
     serializer_class = ComentarioArticuloSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     
-    # Configuración de filtros y búsqueda
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    # Configuración de filtros y búsqueda (con soporte para búsqueda sin acentos)
+    filter_backends = [DjangoFilterBackend, AccentInsensitiveSearchFilter]
     filterset_fields = ['articulo', 'parent']
     search_fields = ['contenido']
 

@@ -9,6 +9,7 @@ from .serializers import BlogSerializer, ComentarioBlogSerializer, LikeBlogSeria
 from .pagination import BlogPagination
 from drf_spectacular.utils import extend_schema
 from app.articles.serializers import ArticuloSerializer
+from app.common.filters import AccentInsensitiveSearchFilter
 
 # ----------------------------
 # 📌 PERMISOS PERSONALIZADOS
@@ -30,12 +31,16 @@ class BlogViewSet(viewsets.ModelViewSet):
 
     Funcionalidades:
     - 🔍 Búsqueda: ?search=término (busca en título y contenido)
+      ✨ NUEVO: La búsqueda ignora acentos y diacríticos
+      - Buscar "noticia" encontrará "noticia" y "noticias"
+      - Buscar "tecnología" encontrará "tecnologia" y "tecnología"
     - 📄 Paginación: 5 blogs por página (?page=1, ?page_size=10)
     - 👁️ Solo lectura: GET /list/ y GET /detail/ disponibles
     - 📌 Cada blog incluye su categoría, artículos relacionados, comentarios y likes
 
     Ejemplos de uso:
     - GET /api/v1/blog/?search=django
+    - GET /api/v1/blog/?search=tecnologia (encuentra "tecnología")
     - GET /api/v1/blog/?page=2&page_size=10
     - GET /api/v1/blog/1/ (detalle específico con artículos y comentarios)
     """
@@ -44,8 +49,8 @@ class BlogViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.AllowAny]  # Solo lectura, acceso público
     pagination_class = BlogPagination
 
-    # Configuración de búsqueda
-    filter_backends = [filters.SearchFilter]
+    # Configuración de búsqueda (con soporte para búsqueda sin acentos)
+    filter_backends = [AccentInsensitiveSearchFilter]
     search_fields = ['titulo_blog', 'contenido']
 
     @extend_schema(
@@ -400,11 +405,11 @@ class BlogViewSet(viewsets.ModelViewSet):
 # ==========================
 # COMENTARIOS
 # ==========================
-@extend_schema(tags=["Blogs - Comentarios"], description="CRUD de comentarios (todos los niveles).")
+@extend_schema(tags=["Blogs - Comentarios"], description="CRUD de comentarios (todos los niveles) con búsqueda sin acentos.")
 class ComentarioBlogViewSet(viewsets.ModelViewSet):
     serializer_class = ComentarioBlogSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, AccentInsensitiveSearchFilter]
     filterset_fields = ['blog', 'parent']
     search_fields = ['contenido']
 

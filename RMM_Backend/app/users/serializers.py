@@ -132,7 +132,7 @@ class UserSerializer(serializers.ModelSerializer):
             'fecha_nacimiento', 'edad', 'pais', 'ciudad', 'genero',
             'perfil_url', 'biografia', 'facebook_url', 'linkedin_url',
             'telefono', 'usuario_unico', 'perfil_completo', 'fecha_creacion', 'fecha_actualizacion',
-            'usuario_unico_sugerido'
+            'usuario_unico_sugerido', 'role'
         ]
         extra_kwargs = {
             'first_name':{
@@ -175,7 +175,7 @@ class UserSerializer(serializers.ModelSerializer):
                 'help_text': 'Nombre de usuario único (opcional, se genera automáticamente)'
             }
         }
-        read_only_fields = ['email', 'edad', 'fecha_creacion', 'fecha_actualizacion', 'perfil_completo']
+        read_only_fields = ['email', 'edad', 'fecha_creacion', 'fecha_actualizacion', 'perfil_completo', 'role']
 
     def update(self, instance, validated_data):
         """

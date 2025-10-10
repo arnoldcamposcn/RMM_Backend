@@ -10,6 +10,7 @@ from .pagination import BlogPagination
 from drf_spectacular.utils import extend_schema
 from app.articles.serializers import ArticuloSerializer
 from app.common.filters import AccentInsensitiveSearchFilter
+from app.common.permissions import CanManageContent, CanComment, CanLike
 
 # ----------------------------
 # 📌 PERMISOS PERSONALIZADOS
@@ -46,7 +47,7 @@ class BlogViewSet(viewsets.ModelViewSet):
     """
     queryset = Blog.objects.all().order_by('-fecha_publicacion')
     serializer_class = BlogSerializer
-    permission_classes = [permissions.AllowAny]  # Solo lectura, acceso público
+    permission_classes = [CanManageContent]  # Lectura: Todos | Escritura: Admin/Superusuario
     pagination_class = BlogPagination
 
     # Configuración de búsqueda (con soporte para búsqueda sin acentos)
@@ -57,7 +58,7 @@ class BlogViewSet(viewsets.ModelViewSet):
         tags=["Blogs - Reacciones"],
         description="Dar o quitar 'me gusta' a un blog."
     )
-    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], permission_classes=[CanLike])
     def toggle_like(self, request, pk=None):
         """
         Acción para dar o quitar 'like' a un blog completo.
@@ -408,7 +409,7 @@ class BlogViewSet(viewsets.ModelViewSet):
 @extend_schema(tags=["Blogs - Comentarios"], description="CRUD de comentarios (todos los niveles) con búsqueda sin acentos.")
 class ComentarioBlogViewSet(viewsets.ModelViewSet):
     serializer_class = ComentarioBlogSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [CanComment]  # Lectura: Todos | Comentar: Autenticados | Editar: Autor o Admin
     filter_backends = [DjangoFilterBackend, AccentInsensitiveSearchFilter]
     filterset_fields = ['blog', 'parent']
     search_fields = ['contenido']

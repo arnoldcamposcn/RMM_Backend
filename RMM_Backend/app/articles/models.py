@@ -8,8 +8,8 @@ User = settings.AUTH_USER_MODEL
 class Articulos(models.Model):
     titulo_articulo = models.CharField("Título del artículo", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
-    imagen_principal = models.ImageField("Imagen", upload_to="articulos/", null=True, blank=True)
-    banner = models.ImageField("Banner", upload_to="banners/", null=True, blank=True)
+    imagen_principal = models.ImageField("Imagen", upload_to="RMM/Articulos-ImagenPrincipal/", null=True, blank=True)
+    banner = models.ImageField("Banner", upload_to="RMM/Articulos-Banner/", null=True, blank=True)
     fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
 
     class Meta:

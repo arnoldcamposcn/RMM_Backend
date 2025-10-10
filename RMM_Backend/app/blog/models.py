@@ -10,8 +10,8 @@ User = settings.AUTH_USER_MODEL
 class Blog(models.Model):
     titulo_blog = models.CharField("Título del noticia", max_length=200)
     contenido = RichTextField("Contenido", blank=True)
-    imagen_principal = models.CharField("Imagen", null=True, blank=True)
-    banner = models.CharField("Banner", null=True, blank=True)
+    imagen_principal = models.ImageField("Imagen", upload_to="RMM/Noticias-ImagenPrincipal/", null=True, blank=True)
+    banner = models.ImageField("Banner", upload_to="RMM/Noticias-Banner/", null=True, blank=True)
     fecha_publicacion = models.DateField("Fecha de publicación" , null=True, blank=True)
     articulos = models.ManyToManyField("articles.Articulos", blank=True, related_name="blogs")
 

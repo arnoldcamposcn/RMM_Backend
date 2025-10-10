@@ -26,6 +26,7 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("role", "SUPERUSUARIO")  # Asignar rol de superusuario
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
@@ -36,8 +37,23 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser, TimeStampedModel):
+    # Definición de roles del sistema
+    class Roles(models.TextChoices):
+        LECTOR = 'LECTOR', _('Lector')
+        ADMIN = 'ADMIN', _('Administrador')
+        SUPERUSUARIO = 'SUPERUSUARIO', _('Superusuario')
+    
     username = None  # Usaremos el email como username
     email = models.EmailField(unique=True)
+    
+    # Sistema de roles
+    role = models.CharField(
+        _('Rol'),
+        max_length=20,
+        choices=Roles.choices,
+        default=Roles.LECTOR,
+        help_text=_('Rol del usuario: Lector (por defecto), Admin o Superusuario')
+    )
     
     # Datos extra
     biografia = models.TextField(null=True, blank=True)
@@ -123,3 +139,28 @@ class User(AbstractUser, TimeStampedModel):
             counter += 1
 
         return unique_username
+    
+    # Métodos para verificar roles
+    def is_lector(self):
+        """Verifica si el usuario es Lector"""
+        return self.role == self.Roles.LECTOR
+    
+    def is_admin(self):
+        """Verifica si el usuario es Administrador"""
+        return self.role == self.Roles.ADMIN
+    
+    def is_superusuario_role(self):
+        """Verifica si el usuario es Superusuario"""
+        return self.role == self.Roles.SUPERUSUARIO
+    
+    def can_access_panel(self):
+        """Verifica si el usuario puede acceder al panel de control"""
+        return self.role in [self.Roles.ADMIN, self.Roles.SUPERUSUARIO]
+    
+    def can_manage_content(self):
+        """Verifica si el usuario puede crear/editar/eliminar contenido"""
+        return self.role in [self.Roles.ADMIN, self.Roles.SUPERUSUARIO]
+    
+    def can_assign_roles(self):
+        """Verifica si el usuario puede asignar roles a otros usuarios"""
+        return self.role == self.Roles.SUPERUSUARIO

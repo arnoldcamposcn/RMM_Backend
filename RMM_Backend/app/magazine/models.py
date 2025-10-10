@@ -6,7 +6,7 @@ class Ediciones(models.Model):
     numero_edicion = models.PositiveIntegerField("Número de edición", unique=True)
     titulo_edicion = models.CharField("Título de la edición", max_length=200)
     contenido = models.CharField("Descripción corta", max_length=5000, blank=True)
-    imagen = models.ImageField("Imagen", upload_to="ediciones/")
+    imagen = models.ImageField("Imagen", upload_to="RMM/Ediciones/")
     fecha_publicacion = models.DateField("Fecha de publicación")
     url_impresa = models.URLField("Versión impresa (URL)", blank=True, null=True)
 

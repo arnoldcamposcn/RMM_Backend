@@ -14,6 +14,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from .serializers import RegistroInicialSerializer, UserSimpleSerializer, UserSerializer, CustomTokenObtainPairSerializer, RequestPasswordResetSerializer, ResetPasswordConfirmSerializer
 from .models import User
+from app.common.permissions import IsSuperusuario
+from .pagination import UsersPagination
+from app.common.filters import AccentInsensitiveSearchFilter
 
 
 # ============================================================================
@@ -137,6 +140,82 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+
+class AdminLoginView(TokenObtainPairView):
+    """
+    Vista de login EXCLUSIVA para panel de administración.
+    
+    Solo permite acceso a usuarios con rol ADMIN o SUPERUSUARIO.
+    Si un usuario con rol LECTOR intenta acceder, se deniega el login.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+    @extend_schema(
+        summary="Login para panel de administración",
+        description="Login exclusivo para Admin y Superusuario. Los usuarios con rol LECTOR no pueden acceder.",
+        tags=['Autenticación - Panel Admin'],
+        responses={
+            200: inline_serializer(
+                name='AdminLoginExitosoResponse',
+                fields={
+                    'access': serializers.CharField(),
+                    'refresh': serializers.CharField(),
+                    'message': serializers.CharField(),
+                    'usuario': UserSerializer(),
+                    'can_access_panel': serializers.BooleanField(),
+                }
+            ),
+            403: inline_serializer(
+                name='AdminLoginForbiddenResponse',
+                fields={
+                    'error': serializers.CharField(),
+                    'message': serializers.CharField(),
+                    'role': serializers.CharField(),
+                }
+            )
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        # Primero autenticamos al usuario normalmente
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            # Obtener el usuario autenticado
+            from rest_framework_simplejwt.tokens import AccessToken
+            access_token = response.data.get('access')
+            
+            # Decodificar el token para obtener el user_id
+            token = AccessToken(access_token)
+            user_id = token['user_id']
+            
+            # Obtener el usuario de la base de datos
+            try:
+                user = User.objects.get(id=user_id)
+                
+                # Verificar si el usuario puede acceder al panel
+                if not user.can_access_panel():
+                    return Response({
+                        'error': 'Acceso denegado',
+                        'message': 'Solo usuarios con rol de Administrador o Superusuario pueden acceder al panel de control.',
+                        'role': user.get_role_display(),
+                        'redirect_to': '/'
+                    }, status=status.HTTP_403_FORBIDDEN)
+                
+                # Si puede acceder, agregar información adicional a la respuesta
+                response.data['can_access_panel'] = True
+                response.data['panel_access'] = {
+                    'can_manage_content': user.can_manage_content(),
+                    'can_assign_roles': user.can_assign_roles(),
+                    'is_superuser': user.is_superusuario_role()
+                }
+                
+            except User.DoesNotExist:
+                return Response({
+                    'error': 'Usuario no encontrado'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        return response
 
 
 class LogoutView(APIView):
@@ -298,3 +377,160 @@ class ResetPasswordConfirmView(APIView):
             "message": "Contraseña restablecida exitosamente",
             "success": True
         }, status=200)
+
+
+# ============================================================================
+# VIEWS DE GESTIÓN DE ROLES (Solo Superusuario)
+# ============================================================================
+
+@extend_schema(
+    summary="Asignar rol a usuario",
+    description="Permite a un superusuario asignar roles (LECTOR, ADMIN) a otros usuarios. "
+                "Solo los superusuarios pueden usar este endpoint.",
+    tags=['Roles - Gestión'],
+    request=inline_serializer(
+        name='AssignRoleRequest',
+        fields={
+            'user_id': serializers.IntegerField(help_text="ID del usuario al que se asignará el rol"),
+            'role': serializers.ChoiceField(
+                choices=['LECTOR', 'ADMIN'],
+                help_text="Rol a asignar: LECTOR o ADMIN"
+            )
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='AssignRoleResponse',
+            fields={
+                'message': serializers.CharField(),
+                'user': UserSerializer(),
+                'previous_role': serializers.CharField(),
+                'new_role': serializers.CharField()
+            }
+        ),
+        403: inline_serializer(
+            name='AssignRoleForbiddenResponse',
+            fields={'error': serializers.CharField()}
+        ),
+        404: inline_serializer(
+            name='AssignRoleNotFoundResponse',
+            fields={'error': serializers.CharField()}
+        )
+    }
+)
+class AssignRoleView(APIView):
+    """
+    Vista para asignar roles a usuarios.
+    
+    Solo los SUPERUSUARIOS pueden asignar roles.
+    Los superusuarios solo pueden asignar roles LECTOR o ADMIN (no pueden crear otros superusuarios).
+    """
+    permission_classes = [IsSuperusuario]
+    
+    def post(self, request):
+        """Asignar un rol a un usuario"""
+        user_id = request.data.get('user_id')
+        new_role = request.data.get('role')
+        
+        # Validaciones
+        if not user_id or not new_role:
+            return Response(
+                {'error': 'Se requiere user_id y role'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validar que el rol sea válido
+        valid_roles = ['LECTOR', 'ADMIN']
+        if new_role not in valid_roles:
+            return Response(
+                {
+                    'error': f'Rol inválido. Los roles permitidos son: {", ".join(valid_roles)}',
+                    'note': 'Solo los superusuarios pueden crear otros superusuarios desde la terminal'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Buscar el usuario
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': f'No se encontró un usuario con ID {user_id}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # No permitir cambiar el rol de un superusuario
+        if user.role == 'SUPERUSUARIO':
+            return Response(
+                {
+                    'error': 'No se puede modificar el rol de un superusuario',
+                    'note': 'Los superusuarios solo pueden ser gestionados desde la terminal'
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # No permitir que se cambie su propio rol
+        if user.id == request.user.id:
+            return Response(
+                {'error': 'No puedes cambiar tu propio rol'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Guardar el rol anterior
+        previous_role = user.role
+        
+        # Asignar el nuevo rol
+        user.role = new_role
+        user.save()
+        
+        # Serializar la respuesta
+        serializer = UserSerializer(user)
+        
+        return Response({
+            'message': f'Rol asignado exitosamente',
+            'user': serializer.data,
+            'previous_role': previous_role,
+            'new_role': new_role,
+            'assigned_by': request.user.email
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Listar usuarios con sus roles",
+    description="Obtiene una lista de todos los usuarios del sistema con sus roles. "
+                "Solo accesible para superusuarios.",
+    tags=['Roles - Gestión'],
+    responses={
+        200: UserSerializer(many=True)
+    }
+)
+class ListUsersWithRolesView(generics.ListAPIView):
+    """
+    Vista para listar todos los usuarios con sus roles.
+    Solo accesible para superusuarios.
+    
+    Funcionalidades:
+    - 🔍 Búsqueda: ?search=término (busca en email, nombre, apellido)
+      ✨ La búsqueda ignora acentos y diacríticos
+      - Buscar "jose" encontrará "José" y "jose"
+      - Buscar "maría" encontrará "maria" y "maría"
+    - 📄 Paginación: 8 usuarios por página (configurable hasta 100)
+    
+    Parámetros:
+    - ?search=término - Buscar usuarios
+    - ?page=1 - Número de página
+    - ?page_size=8 - Cantidad de usuarios por página (máx. 100)
+    
+    Ejemplos de uso:
+    - GET /api/v1/users/roles/users/?search=jose (encuentra "José")
+    - GET /api/v1/users/roles/users/?search=admin@example.com
+    - GET /api/v1/users/roles/users/?page=2&page_size=20
+    """
+    queryset = User.objects.all().order_by('-fecha_creacion')
+    serializer_class = UserSerializer
+    permission_classes = [IsSuperusuario]
+    pagination_class = UsersPagination
+    
+    # Configuración de búsqueda sin acentos
+    filter_backends = [AccentInsensitiveSearchFilter]
+    search_fields = ['email', 'first_name', 'last_name', 'usuario_unico']

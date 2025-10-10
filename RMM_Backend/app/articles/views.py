@@ -9,6 +9,7 @@ from .serializers import ArticuloSerializer, ComentarioArticuloSerializer, LikeA
 from .pagination import ArticulosPagination
 from drf_spectacular.utils import extend_schema
 from app.common.filters import AccentInsensitiveSearchFilter
+from app.common.permissions import CanManageContent, CanComment, CanLike
 
 # ----------------------------
 # 📌 PERMISOS PERSONALIZADOS
@@ -44,7 +45,7 @@ class ArticuloViewSet(viewsets.ModelViewSet):
     """
     queryset = Articulos.objects.all().order_by('-fecha_publicacion')
     serializer_class = ArticuloSerializer
-    permission_classes = [permissions.AllowAny]  # Solo lectura, acceso público
+    permission_classes = [CanManageContent]  # Lectura: Todos | Escritura: Admin/Superusuario
     pagination_class = ArticulosPagination
     
     # Configuración de filtros y búsqueda (con soporte para búsqueda sin acentos)
@@ -55,7 +56,7 @@ class ArticuloViewSet(viewsets.ModelViewSet):
         tags=["Artículos - Reacciones"],
         description="Dar o quitar 'me gusta' a un artículo."
     )
-    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], permission_classes=[CanLike])
     def toggle_like(self, request, pk=None):
         """
         Acción para dar o quitar 'like' a un artículo completo.
@@ -321,7 +322,7 @@ class ComentarioArticuloViewSet(viewsets.ModelViewSet):
     - Paginación automática
     """
     serializer_class = ComentarioArticuloSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [CanComment]  # Lectura: Todos | Comentar: Autenticados | Editar: Autor o Admin
     
     # Configuración de filtros y búsqueda (con soporte para búsqueda sin acentos)
     filter_backends = [DjangoFilterBackend, AccentInsensitiveSearchFilter]

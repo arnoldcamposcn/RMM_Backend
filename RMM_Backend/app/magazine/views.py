@@ -7,6 +7,7 @@ from .models import Ediciones, Newsletter, Contacto
 from .serializers import EdicionesSerializer, NewsletterSerializer, ContactSerializer
 from .pagination import WeeklyEditionPagination
 from app.common.filters import AccentInsensitiveSearchFilter
+from app.common.permissions import CanManageContent
 
 # ----------------------------
 # 📌 EDICIONES
@@ -35,7 +36,7 @@ class EdicionesViewSet(viewsets.ModelViewSet):
     """
     queryset = Ediciones.objects.all()
     serializer_class = EdicionesSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [CanManageContent]  # Lectura: Todos | Escritura: Admin/Superusuario
     pagination_class = WeeklyEditionPagination
 
     # 👇 Importante: activar búsqueda sin acentos y filtros
@@ -65,11 +66,6 @@ class EdicionesViewSet(viewsets.ModelViewSet):
         if page is not None:
             return self.get_paginated_response(self.get_serializer(page, many=True).data)
         return Response(self.get_serializer(ediciones, many=True).data)
-    
-    def get_permissions(self):
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            return [permissions.IsAdminUser()]
-        return [permissions.AllowAny()]
 
 
 # ----------------------------

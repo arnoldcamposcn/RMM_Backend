@@ -112,19 +112,13 @@ class TemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tema
         fields = [
-            "id", "titulo", "contenido", "imagen", "autor",
+            "id", "titulo", "contenido", "autor",
             "categoria_foro", "categoria_foro_id",
             "creado_en", "actualizado_en",
             "comentarios", "likes_count"
         ]
         read_only_fields = ["autor", "creado_en", "actualizado_en"]
 
-    def validate_imagen(self, value):
-        """Validar imagen - permitir string vacío o URL válida"""
-        if not value or value.strip() == "" or value == "null":
-            return None
-        # Si hay valor, puede ser una URL o path de imagen
-        return value.strip()
 
     def get_comentarios(self, obj):
         comentarios_principales = obj.comentarios.filter(parent__isnull=True)

@@ -190,21 +190,21 @@ CORS_ALLOWED_HEADERS = [
 ]
 
 # Bunny CDN Configuration
-BUNNY_USERNAME = config('BUNNY_CDN_STORAGE_ZONE') 
-BUNNY_PASSWORD = config('BUNNY_CDN_API_KEY')    
-BUNNY_REGION = config('BUNNY_CDN_REGION', default='ny') 
-MEDIA_URL = config('BUNNY_CDN_BASE_URL', default='https://codeaunitech.b-cdn.net/')
+# BUNNY_USERNAME = config('BUNNY_CDN_STORAGE_ZONE') 
+# BUNNY_PASSWORD = config('BUNNY_CDN_API_KEY')    
+# BUNNY_REGION = config('BUNNY_CDN_REGION', default='ny') 
+# MEDIA_URL = config('BUNNY_CDN_BASE_URL', default='https://codeaunitech.b-cdn.net/')
 
-STORAGES = {
-    # Almacenamiento por defecto (para MEDIA files)
-    "default": {
-        "BACKEND": "django_bunny.storage.BunnyStorage", # <--- ¡Implementación de Bunny!
-    },
-    # Mantener staticfiles local o usar Bunny también si lo deseas
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
+# STORAGES = {
+#     # Almacenamiento por defecto (para MEDIA files)
+#     "default": {
+#         "BACKEND": "django_bunny.storage.BunnyStorage", # <--- ¡Implementación de Bunny!
+#     },
+#     # Mantener staticfiles local o usar Bunny también si lo deseas
+#     "staticfiles": {
+#         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+#     },
+# }
 
 
 

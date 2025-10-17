@@ -32,7 +32,7 @@ urlpatterns = [
     path("api/v1/magazine/", include("app.magazine.urls")),
     path("api/v1/foro/", include("app.foro.urls")),
     path("api/v1/articles/", include("app.articles.urls")),
-    path("api/v1/blog/", include("app.blog.urls")),
+    path("api/v1/noticias/", include("app.blog.urls")),
 ]
 
 # Servir archivos media en desarrollo

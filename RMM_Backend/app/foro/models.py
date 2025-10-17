@@ -12,7 +12,6 @@ class Tema(models.Model):
     """
     titulo = models.CharField("Título del tema", max_length=255)
     contenido = models.TextField("Contenido del tema")
-    imagen = models.CharField("URL de imagen del tema", max_length=500, null=True, blank=True, help_text="URL de imagen opcional para el tema")
     autor = models.ForeignKey(
         User,
         on_delete=models.CASCADE,

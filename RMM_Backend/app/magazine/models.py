@@ -22,10 +22,8 @@ class Ediciones(models.Model):
 
 class Newsletter(models.Model):
     correo_electronico = models.EmailField("correo electrónico", max_length=200)
-    fecha_publicacion = models.DateField("Fecha de envío")
 
     class Meta:
-        ordering = ["-fecha_publicacion"]
         verbose_name = "Newsletter"
         verbose_name_plural = "Newsletters"
 
@@ -40,10 +38,8 @@ class Contacto(models.Model):
     telefono_contacto = models.IntegerField("Teléfono", blank=True)
     sitio_web_contacto = models.URLField("Sitio web", blank=True)
     mensaje_contacto = models.TextField("Mensaje", blank=True)
-    fecha_publicacion = models.DateField("Fecha de envío")
 
     class Meta:
-        ordering = ["-fecha_publicacion"]
         verbose_name = "Contacto"
         verbose_name_plural = "Contactos"
 
